@@ -1,3 +1,5 @@
+mod wordlist;
+
 use std::{
     fs::File,
     io::{self, BufRead, BufReader},
@@ -19,7 +21,7 @@ struct Cli {
     params: Vec<(String, String)>,
 
     #[arg(short, long, value_parser=parse_wordlist)]
-    wordlist: (String, PathBuf),
+    wordlist: Vec<(String, PathBuf)>,
 }
 
 #[tokio::main]
@@ -27,16 +29,10 @@ async fn main() {
     let cli = Cli::parse();
     let client = Client::new();
 
-    println!(
-        "key: {}, path file: {}",
-        cli.wordlist.0,
-        cli.wordlist.1.to_string_lossy()
-    );
-
-    let readfile = read_line(cli.wordlist.1).unwrap();
-    for (i, line) in readfile.enumerate() {
-        println!("line {} : {}", i + 1, line);
-    }
+    // let readfile = read_line(cli.wordlist.1).unwrap();
+    // for (i, line) in readfile.enumerate() {
+    //     println!("line {} : {}", i + 1, line);
+    // }
 
     let request_builder: RequestBuilder = match cli.method.to_lowercase().as_str() {
         "get" => client.get(cli.url).query(&cli.params),
