@@ -8,6 +8,7 @@ use std::{
 
 use clap::Parser;
 use reqwest::{Client, RequestBuilder};
+use wordlist::Wordlist;
 
 #[derive(Parser)]
 #[command(version = "1.0", about = "Burteforce Tool")]
@@ -28,11 +29,8 @@ struct Cli {
 async fn main() {
     let cli = Cli::parse();
     let client = Client::new();
-
-    // let readfile = read_line(cli.wordlist.1).unwrap();
-    // for (i, line) in readfile.enumerate() {
-    //     println!("line {} : {}", i + 1, line);
-    // }
+    let word_list = Wordlist::from(cli.wordlist).unwrap();
+    let params = param_combination(&word_list.data, 0, Vec::new());
 
     let request_builder: RequestBuilder = match cli.method.to_lowercase().as_str() {
         "get" => client.get(cli.url).query(&cli.params),
@@ -72,12 +70,22 @@ fn parse_wordlist(s: &str) -> Result<(String, PathBuf), String> {
     Ok((s[..pos].to_string(), PathBuf::from(&s[pos + 1..])))
 }
 
-fn read_line<P>(path: P) -> io::Result<impl Iterator<Item = String>>
-where
-    P: AsRef<Path>,
-{
-    let file = File::open(path)?;
-    let reader = BufReader::new(file);
+fn param_combination(
+    params: &Vec<(String, Vec<String>)>,
+    index: usize,
+    mut current: Vec<(String, String)>,
+) -> Vec<Vec<(String, String)>> {
+    if index == params.len() {
+        return [current.clone()].to_vec();
+    }
 
-    Ok(reader.lines().filter_map(Result::ok))
+    let (key, values) = &params[index];
+    let mut out: Vec<Vec<(String, String)>> = Vec::new();
+
+    for value in values {
+        current.push((key.clone(), value.clone()));
+        out.extend(param_combination(params, index + 1, current.clone()))
+    }
+
+    out
 }

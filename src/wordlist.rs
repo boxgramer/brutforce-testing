@@ -20,13 +20,12 @@ impl Wordlist {
         self.data.push((key, value));
     }
 
-    pub fn from(cliargs: Vec<(String, String)>) -> Result<Self, Box<dyn Error>> {
+    pub fn from(cliargs: Vec<(String, PathBuf)>) -> Result<Self, Box<dyn Error>> {
         let mut word_list = Wordlist::new();
         word_list.data = cliargs
             .par_iter()
             .map(|(key, filepath)| {
-                let path = PathBuf::from(filepath);
-                let lines: Vec<String> = Self::read_file(path)?.collect();
+                let lines: Vec<String> = Self::read_file(filepath)?.collect();
                 Ok((key.clone(), lines))
             })
             .collect::<Result<Vec<(String, Vec<String>)>, std::io::Error>>()?;
