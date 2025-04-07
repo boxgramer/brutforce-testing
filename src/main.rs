@@ -5,7 +5,9 @@ use std::{path::PathBuf, time::Instant, usize};
 use clap::Parser;
 use futures::stream::{FuturesOrdered, StreamExt};
 use prettytable::{row, Table};
+use rayon::prelude::*;
 use reqwest::{Client, RequestBuilder};
+use scraper::{Html, Selector};
 use tokio::task::JoinHandle;
 use wordlist::Wordlist;
 
@@ -36,7 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let method = cli.method.ok_or(String::from("GET"))?;
 
-    let mut tasks: FuturesOrdered<JoinHandle<Option<(String, String, u16, u128, usize)>>> =
+    let mut tasks: FuturesOrdered<JoinHandle<Option<(String, String, u16, u128, usize, String)>>> =
         FuturesOrdered::new();
 
     let client = Client::new();
@@ -60,9 +62,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     let mut table = Table::new();
-    table.add_row(row!["URL", "Method", "Status", "RTT(ms)", "Size Body"]);
-    while let Some(Ok(Some((url, method, status, duration, size)))) = tasks.next().await {
-        table.add_row(row![url, method, status, duration, size]);
+    table.add_row(row![
+        "URL",
+        "Method",
+        "Status",
+        "RTT(ms)",
+        "Size Body",
+        "Text"
+    ]);
+    while let Some(Ok(Some((url, method, status, duration, size, text)))) = tasks.next().await {
+        table.add_row(row![url, method, status, duration, size, text]);
     }
     table.printstd();
 
@@ -127,7 +136,7 @@ fn create_request_builder(
     Ok(builder)
 }
 fn push_to_task(
-    task: &mut FuturesOrdered<JoinHandle<Option<(String, String, u16, u128, usize)>>>,
+    task: &mut FuturesOrdered<JoinHandle<Option<(String, String, u16, u128, usize, String)>>>,
     request_builder: RequestBuilder,
     client: Client,
 ) {
@@ -138,17 +147,26 @@ fn push_to_task(
         let method = request.method().clone();
         let result = client.execute(request).await;
         let duration = start.elapsed().as_millis();
+
         match result {
-            Ok(res) => Some((
-                url.to_string(),
-                method.to_string(),
-                res.status().as_u16(),
-                duration,
-                match res.text().await {
-                    Ok(text) => text.len(),
-                    Err(_) => 0,
-                },
-            )),
+            Ok(res) => {
+                let status = res.status().as_u16();
+                let body = res.text().await.unwrap_or(String::new());
+                let text = if status == 302 as u16 {
+                    "found".to_string()
+                } else {
+                    "-".to_string()
+                };
+
+                Some((
+                    url.to_string(),
+                    method.to_string(),
+                    status,
+                    duration,
+                    body.len(),
+                    text,
+                ))
+            }
             Err(e) => {
                 eprintln!("x{} =>{} ", url, e);
                 None
