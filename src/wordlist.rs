@@ -16,10 +16,6 @@ impl Wordlist {
         Self { data: Vec::new() }
     }
 
-    pub fn add(&mut self, key: String, value: Vec<String>) {
-        self.data.push((key, value));
-    }
-
     pub fn from(cliargs: Vec<(String, PathBuf)>) -> Result<Self, Box<dyn Error>> {
         let mut word_list = Wordlist::new();
         word_list.data = cliargs
@@ -40,6 +36,9 @@ impl Wordlist {
         let file = File::open(path)?;
         let reader = BufReader::new(file);
 
-        Ok(reader.lines().filter_map(Result::ok))
+        Ok(reader
+            .lines()
+            .filter_map(Result::ok)
+            .filter(|l| !l.trim().is_empty()))
     }
 }
